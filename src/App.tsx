@@ -1,6 +1,6 @@
 import { FaBars } from "react-icons/fa6";
 import { Input } from "./components/input";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Station as StationType } from "./@types/station";
 import { Station } from "./components/station";
 import { getStations } from "./http/get-stations";
@@ -15,8 +15,11 @@ function App() {
   const [isPending, startTransition] = useTransition();
   const [searchTerm, setSearchTerm] = useState("");
   const [hovered, setHovered] = useState<string | null>(null);
+  const [playingStationId, setPlayingStationId] = useState<string | null>(null);
   const [lastPlayedStation, setLastPlayedStation] =
     useState<StationType | null>(null);
+
+  const audioRef = useRef(new Audio());
 
   useEffect(() => {
     startTransition(async () => {
@@ -26,7 +29,6 @@ function App() {
           response.map((station) => ({
             ...station,
             favorite: false,
-            playing: false,
           }))
         );
       } catch (err) {
@@ -55,16 +57,25 @@ function App() {
   );
 
   const handlePlay = (serveruuid: string) => {
-    setStations((prevStations) =>
-      prevStations.map((station) =>
-        station.serveruuid === serveruuid
-          ? { ...station, playing: !station.playing }
-          : { ...station, playing: false }
-      )
-    );
-
     const selectedStation = stations.find((s) => s.serveruuid === serveruuid);
-    if (selectedStation) setLastPlayedStation(selectedStation);
+
+    if (!selectedStation) return;
+
+    if (playingStationId === serveruuid) {
+      audioRef.current.pause();
+      setPlayingStationId(null);
+    } else {
+      audioRef.current.pause();
+      audioRef.current.src = selectedStation.url_resolved;
+      audioRef.current.play().catch(() => {
+        alert("Erro ao tocar estação " + selectedStation.name);
+        audioRef.current.pause();
+        setPlayingStationId(null)
+      });
+
+      setPlayingStationId(serveruuid);
+      setLastPlayedStation(selectedStation);
+    }
   };
 
   return (
@@ -131,22 +142,23 @@ function App() {
             />
           </div>
           {/* PLAYER DA RÁDIO */}
+
           <div className="p-2 bg-gray-200 rounded-md">
             <Station.Root>
               <div className="flex gap-2 items-center">
-                {stations.some((station) => station.playing) ||
-                lastPlayedStation ? (
-                  <Station.Root key={lastPlayedStation?.serveruuid}>
+                {lastPlayedStation ? (
+                  <Station.Root key={lastPlayedStation.serveruuid}>
                     <div className="flex gap-2 items-center">
                       <Station.Action
-                        Icon={lastPlayedStation?.playing ? FaStop : FaPlay}
-                        onClick={() =>
-                          lastPlayedStation &&
-                          handlePlay(lastPlayedStation.serveruuid)
+                        Icon={
+                          playingStationId === lastPlayedStation.serveruuid
+                            ? FaStop
+                            : FaPlay
                         }
+                        onClick={() => handlePlay(lastPlayedStation.serveruuid)}
                       />
                       <Station.Label
-                        label={lastPlayedStation?.name || ""}
+                        label={lastPlayedStation.name}
                         className="text-xl font-semibold"
                       />
                     </div>
@@ -170,10 +182,13 @@ function App() {
                     <Station.Root>
                       <div className="flex gap-2 items-center">
                         <Station.Action
-                          Icon={station.playing ? FaPlay : FaStop}
+                          Icon={
+                            playingStationId === station.serveruuid
+                              ? FaStop
+                              : FaPlay
+                          }
                           onClick={() => handlePlay(station.serveruuid)}
                         />
-
                         <Station.Label label={station.name} />
                       </div>
                       {hovered === station.serveruuid && (
@@ -193,7 +208,6 @@ function App() {
               <span>Nenhuma estação favorita ainda</span>
             )}
           </div>
-          ;
         </div>
       </main>
     </div>
