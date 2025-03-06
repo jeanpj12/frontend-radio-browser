@@ -5,6 +5,11 @@ import { Station as StationType } from "./@types/station";
 import { Station } from "./components/station";
 import { getStations } from "./http/get-stations";
 import { HTTPError } from "ky";
+import { FaPlay } from "react-icons/fa";
+import { MdFavorite, MdFavoriteBorder } from "react-icons/md";
+import { MdModeEdit } from "react-icons/md";
+import { TbTrashFilled } from "react-icons/tb";
+
 
 function App() {
   const [stations, setStations] = useState<StationType[]>([]);
@@ -63,10 +68,17 @@ function App() {
                   return (
                     <Station.Root key={station.serveruuid}>
                       <Station.Label label={station.name} />
-                      <Station.Favorite
-                        isFavorite={station.favorite}
-                        onClick={() => handleFavorite(station.serveruuid)}
-                      />
+                      {station.favorite ? (
+                        <Station.Action
+                          Icon={MdFavorite}
+                          onClick={() => handleFavorite(station.serveruuid)}
+                        />
+                      ) : (
+                        <Station.Action
+                          Icon={MdFavoriteBorder}
+                          onClick={() => handleFavorite(station.serveruuid)}
+                        />
+                      )}
                     </Station.Root>
                   );
                 })
@@ -74,10 +86,17 @@ function App() {
                   return (
                     <Station.Root key={station.serveruuid}>
                       <Station.Label label={station.name} />
-                      <Station.Favorite
-                        isFavorite={station.favorite}
-                        onClick={() => handleFavorite(station.serveruuid)}
-                      />
+                      {station.favorite ? (
+                        <Station.Action
+                          Icon={MdFavorite}
+                          onClick={() => handleFavorite(station.serveruuid)}
+                        />
+                      ) : (
+                        <Station.Action
+                          Icon={MdFavoriteBorder}
+                          onClick={() => handleFavorite(station.serveruuid)}
+                        />
+                      )}
                     </Station.Root>
                   );
                 })}
@@ -103,19 +122,18 @@ function App() {
           </div>
 
           <div>
-            {/* Mudar para ter somente Station.action */}
 
             {stations.some((station) => station.favorite) ? (
               stations.map((station) =>
                 station.favorite ? (
                   <Station.Root key={station.serveruuid}>
-                    <div>
-                      <Station.Play />
+                    <div className="flex gap-2 items-center">
+                      <Station.Action Icon={FaPlay} />
                       <Station.Label label={station.name} />
                     </div>
-                    <div>
-                      <Station.Edit />
-                      <Station.Delete />
+                    <div className="flex gap-2 items-center">
+                      <Station.Action Icon={MdModeEdit}/>
+                      <Station.Action Icon={TbTrashFilled}/>
                     </div>
                   </Station.Root>
                 ) : null
