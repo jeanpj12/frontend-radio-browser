@@ -1,5 +1,6 @@
 export interface Station {
   favorite: boolean
+  playing: boolean
   changeuuid: string;
   stationuuid: string;
   serveruuid: string;
