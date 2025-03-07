@@ -3,7 +3,7 @@ import { api } from "./api-client";
 
 export async function getStations() {
   const response = await api
-    .get("json/stations/search?limit=10")
+    .get("json/stations/search?limit=30")
     .json<Station[]>();
   return response;
 }

@@ -9,6 +9,7 @@ import { FaPlay, FaStop } from "react-icons/fa";
 import { MdFavorite, MdFavoriteBorder } from "react-icons/md";
 import { MdModeEdit } from "react-icons/md";
 import { TbTrashFilled } from "react-icons/tb";
+import { IoChevronBack, IoChevronForward } from "react-icons/io5";
 import { Tag } from "./components/tag";
 import { Modal } from "./components/modal";
 import { IoIosCloseCircle } from "react-icons/io";
@@ -27,7 +28,19 @@ function App() {
   const [openModal, setOpenModal] = useState(false);
   const [newTag, setNewTag] = useState("");
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const stationsPerPage = 10;
+
+  const [favorites, setFavorites] = useState<string[]>([]);
+
   const audioRef = useRef(new Audio());
+
+  useEffect(() => {
+    const savedFavorites = localStorage.getItem("favoriteStations");
+    if (savedFavorites) {
+      setFavorites(JSON.parse(savedFavorites));
+    }
+  }, []);
 
   useEffect(() => {
     startTransition(async () => {
@@ -36,7 +49,7 @@ function App() {
         setStations(
           response.map((station) => ({
             ...station,
-            favorite: false,
+            favorite: favorites.includes(station.stationuuid),
           }))
         );
       } catch (err) {
@@ -48,26 +61,61 @@ function App() {
         );
       }
     });
-  }, []);
+  }, [favorites]);
 
   const handleFavorite = (stationUuid: string) => {
     setStations((prevStations) =>
       prevStations.map((station) =>
-        station.serveruuid === stationUuid
+        station.stationuuid === stationUuid
           ? { ...station, favorite: !station.favorite }
           : station
       )
     );
+
+    const isFavorite = favorites.includes(stationUuid);
+
+    let updatedFavorites = [];
+
+    if (isFavorite) {
+      updatedFavorites = favorites.filter((fav) => fav !== stationUuid);
+    } else {
+      updatedFavorites = [...favorites, stationUuid];
+    }
+
+    setFavorites(updatedFavorites);
+    localStorage.setItem("favoriteStations", JSON.stringify(updatedFavorites));
   };
 
-  const filteredStations = stations.filter((station) =>
-    station.name.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredStations = stations.filter(
+    (station) =>
+      station.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      station.country.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      station.language.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const totalPages = Math.ceil(filteredStations.length / stationsPerPage);
+  const indexOfLastStation = currentPage * stationsPerPage;
+  const indexOfFirstStation = indexOfLastStation - stationsPerPage;
+  const currentStations = filteredStations.slice(
+    indexOfFirstStation,
+    indexOfLastStation
+  );
+
+  const handlePageChange = (pageNumber: number) => {
+    setCurrentPage(pageNumber);
+  };
 
   const filteredFavoriteStations = stations
     .filter((station) => station.favorite)
-    .filter((station) =>
-      station.name.toLowerCase().includes(searchFavoriteTerm.toLowerCase())
+    .filter(
+      (station) =>
+        station.name.toLowerCase().includes(searchFavoriteTerm.toLowerCase()) ||
+        station.country
+          .toLowerCase()
+          .includes(searchFavoriteTerm.toLowerCase()) ||
+        station.language
+          .toLowerCase()
+          .includes(searchFavoriteTerm.toLowerCase())
     );
 
   const handlePlay = (serveruuid: string) => {
@@ -150,6 +198,7 @@ function App() {
       <aside
         className={`bg-gray-100 p-5 flex flex-col items-start gap-5 border-r border-gray-300
           fixed md:relative top-0 left-0 h-full transform transition-transform duration-300
+          overflow-hidden
           ${
             isSidebarOpen ? "translate-x-0" : "-translate-x-full"
           } md:translate-x-0`}
@@ -169,39 +218,65 @@ function App() {
 
         <div className="flex flex-col gap-2 w-full">
           <h3 className="text-sm font-bold">Stations</h3>
-          <div className="flex flex-col gap-1 w-full">
+          <div className="flex flex-col gap-1 w-full max-h-full overflow-auto scrollbar-thumb-rounded-full scrollbar-thin scrollbar-track-rounded-full scrollbar scrollbar-thumb-gray-400 scrollbar-track-slate-300/0">
             {isPending && <p className="font-bold">Loading Stations...</p>}
-            {filteredStations.length > 0
-              ? filteredStations.map((station: StationType) => {
-                  return (
-                    <Station.Root key={station.serveruuid}>
-                      <Station.Label label={station.name} />
-                      {station.favorite ? (
-                        <Station.Action
-                          Icon={MdFavorite}
-                          onClick={() => handleFavorite(station.serveruuid)}
-                        />
-                      ) : (
-                        <Station.Action
-                          Icon={MdFavoriteBorder}
-                          onClick={() => handleFavorite(station.serveruuid)}
-                        />
-                      )}
-                    </Station.Root>
-                  );
-                })
-              : stations.map((station: StationType) => {
-                  return (
-                    <Station.Root key={station.serveruuid}>
-                      <Station.Label label={station.name} />
+            {currentStations.length > 0 ? (
+              currentStations.map((station: StationType) => {
+                return (
+                  <Station.Root key={station.stationuuid}>
+                    <Station.Label label={station.name} />
+                    {station.favorite ? (
                       <Station.Action
-                        Icon={station.favorite ? MdFavorite : MdFavoriteBorder}
-                        onClick={() => handleFavorite(station.serveruuid)}
+                        Icon={MdFavorite}
+                        onClick={() => handleFavorite(station.stationuuid)}
                       />
-                    </Station.Root>
-                  );
-                })}
+                    ) : (
+                      <Station.Action
+                        Icon={MdFavoriteBorder}
+                        onClick={() => handleFavorite(station.stationuuid)}
+                      />
+                    )}
+                  </Station.Root>
+                );
+              })
+            ) : (
+              <p>No stations found</p>
+            )}
           </div>
+
+          {/* CONTROLE DE PAGINACAO */}
+
+          {filteredStations.length > 0 && (
+            <div className="flex justify-between items-center mt-4">
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className={`p-1 rounded ${
+                  currentPage === 1
+                    ? "opacity-50 cursor-not-allowed"
+                    : "hover:bg-gray-200"
+                }`}
+              >
+                <IoChevronBack size={18} />
+              </button>
+
+              <span className="text-sm">
+                Page {currentPage} of {totalPages}
+              </span>
+
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className={`p-1 rounded ${
+                  currentPage === totalPages
+                    ? "opacity-50 cursor-not-allowed"
+                    : "hover:bg-gray-200"
+                }`}
+              >
+                <IoChevronForward size={18} />
+              </button>
+            </div>
+          )}
         </div>
       </aside>
       <main className="md:p-20 p-8 flex flex-col gap-5 items-start md:justify-center">
