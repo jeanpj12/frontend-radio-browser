@@ -10,6 +10,8 @@ import { MdFavorite, MdFavoriteBorder } from "react-icons/md";
 import { MdModeEdit } from "react-icons/md";
 import { TbTrashFilled } from "react-icons/tb";
 import { Tag } from "./components/tag";
+import { Modal } from "./components/modal";
+import { IoIosCloseCircle } from "react-icons/io";
 
 function App() {
   const [stations, setStations] = useState<StationType[]>([]);
@@ -21,6 +23,9 @@ function App() {
   const [lastPlayedStation, setLastPlayedStation] =
     useState<StationType | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [editStation, setEditStation] = useState<StationType | null>(null);
+  const [openModal, setOpenModal] = useState(false);
+  const [newTag, setNewTag] = useState("");
 
   const audioRef = useRef(new Audio());
 
@@ -84,6 +89,58 @@ function App() {
 
       setPlayingStationId(serveruuid);
       setLastPlayedStation(selectedStation);
+    }
+  };
+
+  const handleEdit = (serveruuid: string) => {
+    const station = stations.find((s) => s.serveruuid === serveruuid);
+    if (station) {
+      setEditStation({ ...station });
+      setOpenModal(true);
+    }
+  };
+
+  const handleEditInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (editStation) {
+      setEditStation({
+        ...editStation,
+        [e.target.name]: e.target.value,
+      });
+    }
+  };
+
+  const handleSendEditedStation = (serveruuid: string) => {
+    if (editStation) {
+      setStations(
+        stations.map((station) =>
+          station.serveruuid === serveruuid
+            ? { ...station, ...editStation }
+            : station
+        )
+      );
+    }
+
+    setEditStation(null);
+    setOpenModal(false);
+  };
+
+  const handleDeleteTag = (tag: string) => {
+    if (editStation) {
+      const tagsArray = editStation.tags.split(",").filter((t) => t !== tag);
+      setEditStation({
+        ...editStation,
+        tags: tagsArray.join(","),
+      });
+    }
+  };
+
+  const handleAddTag = () => {
+    if (newTag.trim() && editStation) {
+      setEditStation({
+        ...editStation,
+        tags: editStation.tags ? `${editStation.tags},${newTag}` : newTag,
+      });
+      setNewTag("");
     }
   };
 
@@ -155,6 +212,7 @@ function App() {
         </div>
         <div className="w-full flex flex-col gap-5 justify-start md:max-h-[500px] overflow-hidden">
           <h1 className="text-2xl font-bold">Radio Browser</h1>
+
           <div className="w-full flex justify-between flex-col md:flex-row gap-2">
             <span className="text-xl">Favorite Radios</span>
             <Input
@@ -220,14 +278,19 @@ function App() {
                           )}
                         </div>
                         <div className="flex gap-2">
-                          <Tag label={station.country}/>
-                          <Tag label="Rock" />
-                          <Tag label="News" />
+                          <Tag label={station.country} />
+                          {station.tags &&
+                            station.tags
+                              .split(",")
+                              .map((tag) => <Tag key={tag} label={tag} />)}
                         </div>
                       </div>
                     </div>
                     <div className="md:hidden flex gap-2 items-center">
-                      <Station.Action Icon={MdModeEdit} />
+                      <Station.Action
+                        Icon={MdModeEdit}
+                        onClick={() => handleEdit(station.serveruuid)}
+                      />
                       <Station.Action
                         Icon={TbTrashFilled}
                         onClick={() => handleFavorite(station.serveruuid)}
@@ -237,7 +300,10 @@ function App() {
                     <div className="hidden md:flex gap-2 items-center">
                       {hovered === station.serveruuid && (
                         <>
-                          <Station.Action Icon={MdModeEdit} />
+                          <Station.Action
+                            Icon={MdModeEdit}
+                            onClick={() => handleEdit(station.serveruuid)}
+                          />
                           <Station.Action
                             Icon={TbTrashFilled}
                             onClick={() => handleFavorite(station.serveruuid)}
@@ -253,6 +319,62 @@ function App() {
             )}
           </div>
         </div>
+
+        {openModal && (
+          <Modal.Root>
+            <Modal.Header
+              title="Edit station"
+              onAction={() => setOpenModal((prev) => !prev)}
+            />
+            <Modal.Content className="flex flex-col gap-2">
+              <Input
+                value={editStation?.name}
+                name="name"
+                onChange={handleEditInputChange}
+              />
+              <Input
+                value={editStation?.country}
+                name="country"
+                onChange={handleEditInputChange}
+              />
+              <div className="grid grid-cols-[1fr_150px] gap-2">
+                <Input
+                  name="tags"
+                  value={newTag}
+                  onChange={(e) => setNewTag(e.target.value)}
+                />
+                <button
+                  className="py-2 px-4 bg-gray-900 text-white rounded-md"
+                  onClick={handleAddTag}
+                >
+                  Adicionar tag
+                </button>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                {editStation?.tags &&
+                  editStation?.tags
+                    .split(",")
+                    .map((tag) => (
+                      <Tag
+                        key={tag}
+                        label={tag}
+                        Icon={IoIosCloseCircle}
+                        onAction={() => handleDeleteTag(tag)}
+                      />
+                    ))}
+              </div>
+              <button
+                className="py-2 px-4 bg-gray-900 text-white rounded-md cursor-pointer"
+                onClick={() =>
+                  editStation?.serveruuid &&
+                  handleSendEditedStation(editStation.serveruuid)
+                }
+              >
+                Salvar Edição
+              </button>
+            </Modal.Content>
+          </Modal.Root>
+        )}
       </main>
     </div>
   );
