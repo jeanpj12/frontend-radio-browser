@@ -352,7 +352,7 @@ function App() {
                             <span className="text-sm">(Playing...)</span>
                           )}
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 flex-wrap">
                           <Tag label={station.country} />
                           {station.tags &&
                             station.tags
