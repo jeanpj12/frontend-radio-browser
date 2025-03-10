@@ -31,7 +31,8 @@ function App() {
   const [currentPage, setCurrentPage] = useState(1);
   const stationsPerPage = 10;
 
-  const [favorites, setFavorites] = useState<string[]>([]);
+  const [favorites, setFavorites] = useState<StationType[] | null>(null);
+  const [favoriteLoaded, setFavoriteLoaded] = useState<boolean>(false);
 
   const audioRef = useRef(new Audio());
 
@@ -39,29 +40,34 @@ function App() {
     const savedFavorites = localStorage.getItem("favoriteStations");
     if (savedFavorites) {
       setFavorites(JSON.parse(savedFavorites));
-    }
+    } else setFavorites([]);
+    setFavoriteLoaded(true);
   }, []);
 
   useEffect(() => {
-    startTransition(async () => {
-      try {
-        const response = await getStations();
-        setStations(
-          response.map((station) => ({
-            ...station,
-            favorite: favorites.includes(station.stationuuid),
-          }))
-        );
-      } catch (err) {
-        if (err instanceof HTTPError) {
-          console.log(err.message);
+    if (favorites) {
+      startTransition(async () => {
+        try {
+          const response = await getStations();
+          setStations(() =>
+            response.map((station) => ({
+              ...station,
+              favorite: favorites.some(
+                (fav) => fav.stationuuid === station.stationuuid
+              ),
+            }))
+          );
+        } catch (err) {
+          if (err instanceof HTTPError) {
+            console.log(err.message);
+          }
+          alert(
+            "Erro ao carregar estações de rádio! Por favor, tente mais tarde."
+          );
         }
-        alert(
-          "Erro ao carregar estações de rádio! Por favor, tente mais tarde."
-        );
-      }
-    });
-  }, [favorites]);
+      });
+    }
+  }, [favoriteLoaded]);
 
   const handleFavorite = (stationUuid: string) => {
     setStations((prevStations) =>
@@ -72,14 +78,21 @@ function App() {
       )
     );
 
-    const isFavorite = favorites.includes(stationUuid);
+    if (!favorites) return console.log("Erro ao carregar favoritos");
 
-    let updatedFavorites = [];
+    const isFavorite = favorites.some((fav) => fav.stationuuid === stationUuid);
+
+    let updatedFavorites: StationType[] = [];
 
     if (isFavorite) {
-      updatedFavorites = favorites.filter((fav) => fav !== stationUuid);
+      updatedFavorites = favorites.filter(
+        (fav) => fav.stationuuid !== stationUuid
+      );
     } else {
-      updatedFavorites = [...favorites, stationUuid];
+      const newFavorite = stations.find(
+        (station) => station.stationuuid === stationUuid
+      );
+      if (newFavorite) updatedFavorites = [...favorites, newFavorite];
     }
 
     setFavorites(updatedFavorites);
@@ -105,18 +118,14 @@ function App() {
     setCurrentPage(pageNumber);
   };
 
-  const filteredFavoriteStations = stations
-    .filter((station) => station.favorite)
-    .filter(
-      (station) =>
-        station.name.toLowerCase().includes(searchFavoriteTerm.toLowerCase()) ||
-        station.country
-          .toLowerCase()
-          .includes(searchFavoriteTerm.toLowerCase()) ||
-        station.language
-          .toLowerCase()
-          .includes(searchFavoriteTerm.toLowerCase())
-    );
+  const filteredFavoriteStations = favorites ? favorites.filter(
+    (station) =>
+      station.name.toLowerCase().includes(searchFavoriteTerm.toLowerCase()) ||
+      station.country
+        .toLowerCase()
+        .includes(searchFavoriteTerm.toLowerCase()) ||
+      station.language.toLowerCase().includes(searchFavoriteTerm.toLowerCase())
+  ) : [];
 
   const handlePlay = (serveruuid: string) => {
     const selectedStation = stations.find((s) => s.serveruuid === serveruuid);
@@ -141,7 +150,7 @@ function App() {
   };
 
   const handleEdit = (serveruuid: string) => {
-    const station = stations.find((s) => s.serveruuid === serveruuid);
+    const station = favorites!.find((s) => s.serveruuid === serveruuid);
     if (station) {
       setEditStation({ ...station });
       setOpenModal(true);
@@ -159,8 +168,8 @@ function App() {
 
   const handleSendEditedStation = (serveruuid: string) => {
     if (editStation) {
-      setStations(
-        stations.map((station) =>
+      setFavorites(
+        favorites!.map((station) =>
           station.serveruuid === serveruuid
             ? { ...station, ...editStation }
             : station
@@ -168,6 +177,8 @@ function App() {
       );
     }
 
+    const updatedFavorites = favorites;
+    localStorage.setItem("favoriteStations", JSON.stringify(updatedFavorites));
     setEditStation(null);
     setOpenModal(false);
   };
